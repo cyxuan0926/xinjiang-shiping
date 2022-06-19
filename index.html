@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>新疆视频网页</title>
+  <link rel="stylesheet" href="./static/css/element-ui.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link rel="stylesheet" href="./static/css/video-js.min.css">
+  <script src="./static/js/vue.js"></script>
+  <script src="./static/js/element-ui.js"></script>
+  <script src="./static/js/moment.min.js"></script>
+  <script src="./static/js/locale/zh-cn.js"></script>
+  <script src="./static/js/axios.min.js"></script>
+  <script src="./static/js/video.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <el-row class="el-row__selector">
+      <el-date-picker
+        v-model="selectDate"
+        type="date"
+        placeholder="选择日期"
+        value-format="yyyy-MM-dd"
+        :editable="false"
+      ></el-date-picker>
+
+      <el-button
+        class="el-button__search"
+        type="primary"
+        @click="onSearch"
+      >搜 索</el-button>
+    </el-row>
+
+    <el-row class="el-row__content">
+      <template v-for="item of inputData">
+        <div class="content">
+          <el-image
+            :src="item.thumbnail"
+            alt="封面图片"
+            lazy
+            @click.native="onShow(item)"
+          >
+            <img
+              slot="error"
+              src="./static/images/thumbnail-default.png"
+              alt="默认图片"
+            >
+          </el-image>
+
+          <span class="center">房间号：{{ item.room }}</span>
+          <span class="center">录制时间：{{ item.date }}</span>
+        </div>
+      </template>
+    </el-row>
+
+    <el-dialog
+      ref="dialog"
+      :title="title"
+      :visible.sync="dialogVisible"
+      :close-on-click-modal="false"
+      @open="onOpen"
+      @closed="onClosed"
+    >
+
+      <el-row v-html="videoJsHtml"></el-row>
+     
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="dialogVisible = false">关 闭</el-button>
+      </span>
+    </el-dialg>
+  </div>
+</body>
+<script>
+  Vue.config.productionTip = false
+
+  const httpInstance = axios.create({
+    timeout: 120000,
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    // withCredentials: true
+  })
+
+  const instance = new Vue({
+    el: '#app',
+    data() {
+      return {
+        selectDate: '',
+        inputData: [],
+        dialogVisible: false,
+        videoUrl: '',
+        videoJsInstance: null,
+        title: ''
+      }
+    },
+    computed: {
+      videoJsHtml() {
+        return `
+          <video
+            id="myVideo"
+            class="video-js vjs-default-skin vjs-big-play-centered"
+            controls
+            preload="none"
+            height="400px"
+          >    
+            <source
+              id="source"
+              src="${this.videoUrl}"
+              type="application/x-mpegURL"
+            >
+          </video>
+        `
+      }
+    },
+    methods: {
+      onSearch() {
+        if (this.selectDate) {
+          let formData = new FormData()
+
+          formData.append('date', this.selectDate)
+
+          httpInstance.post('http://192.168.0.154:5000/api/v1/videos', formData).then(response => {
+            this.inputData = response.data && Array.isArray(response.data['videos']) ? response.data['videos'].map(item => {
+              const { date } = item
+
+              const filterDate = moment(date).subtract(moment().utcOffset() / 60 ,'hours').format('YYYY-MM-DD HH:mm:ss')
+
+              return {
+                ...item,
+                date: filterDate
+              }
+            }) : []
+          }).catch(err => {
+            Promise.reject(err)
+          })
+        } else {
+          this.onNoDateSearch()
+        }
+      },
+
+      onShow(item) {
+        const { url, room, date } = item
+        this.dialogVisible = true
+        this.videoUrl = url
+        this.title = `房间：${room}  录制时间：${date}`
+      },
+
+      onOpen() {
+        this.$nextTick(function() {
+          this.videoJsInstance = videojs('myVideo')
+          this.videoJsInstance.reset()
+          this.videoJsInstance.src([
+            {
+              type: 'application/x-mpegURL',
+              src: this.videoUrl
+            }
+          ])
+          this.videoJsInstance.load();
+        })
+      },
+
+      onNoDateSearch() {
+        httpInstance.get('http://192.168.0.154:5000/api/v1/videos').then(response => {
+          this.inputData = response.data && Array.isArray(response.data['videos']) ? response.data['videos'].map(item => {
+            const { date } = item
+
+            const filterDate = moment(date).subtract(moment().utcOffset() / 60 ,'hours').format('YYYY-MM-DD HH:mm:ss')
+
+            return {
+              ...item,
+              date: filterDate
+            }
+          }) : []
+        }).catch(err => {
+          Promise.reject(err)
+        })
+      },
+
+      onClosed() {
+        this.videoJsInstance.dispose()
+        this.videoUrl = ''
+      }
+    },
+
+    mounted() {
+      this.onNoDateSearch()
+    }
+  })
+</script>
+</html>

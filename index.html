@@ -120,7 +120,7 @@
 
           formData.append('date', this.selectDate)
 
-          httpInstance.post('http://192.168.0.154:5000/api/v1/videos', formData).then(response => {
+          httpInstance.post('http://vod-manager:5000/api/v1/videos', formData).then(response => {
             this.inputData = response.data && Array.isArray(response.data['videos']) ? response.data['videos'].map(item => {
               const { date } = item
 
@@ -161,7 +161,8 @@
       },
 
       onNoDateSearch() {
-        httpInstance.get('http://192.168.0.154:5000/api/v1/videos').then(response => {
+        // vod-manager: 为了映射 服务端的 ip地址
+        httpInstance.get('http://vod-manager:5000/api/v1/videos').then(response => {
           this.inputData = response.data && Array.isArray(response.data['videos']) ? response.data['videos'].map(item => {
             const { date } = item
 
